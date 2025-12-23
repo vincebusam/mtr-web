@@ -324,7 +324,7 @@
       const port = window.location.port ? `:${window.location.port}` : '';
       const wsUrl = `${protocol}//${window.location.hostname}${port}${window.location.pathname}ws`;
       
-      ws = new WebSocket(wsUrl);
+      ws = new WebSocket(wsUrl, "mtr");
 
       ws.onopen = () => {
         console.log('WebSocket connected');
