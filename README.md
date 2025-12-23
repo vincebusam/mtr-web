@@ -27,3 +27,6 @@ Requires `asyncio`, `aiohttp`, and `aiohttp_core`.
 
 Browse to `http://localhost:8080`
 
+### Screenshot
+
+![Screenshot](screenshot.jpg)
