@@ -35,24 +35,24 @@ static void sigint_handler(int sig) {
 static int is_valid_target(const char *target) {
     regex_t hostname_regex, ip_regex;
     int ret;
-    
+
     // Hostname pattern
     ret = regcomp(&hostname_regex, "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,253}[a-zA-Z0-9]$", REG_EXTENDED);
     if (ret) return 0;
-    
+
     // IP pattern
     ret = regcomp(&ip_regex, "^([0-9]{1,3}\\.){3}[0-9]{1,3}$", REG_EXTENDED);
     if (ret) {
         regfree(&hostname_regex);
         return 0;
     }
-    
+
     int is_hostname = (regexec(&hostname_regex, target, 0, NULL, 0) == 0);
     int is_ip = (regexec(&ip_regex, target, 0, NULL, 0) == 0);
-    
+
     regfree(&hostname_regex);
     regfree(&ip_regex);
-    
+
     return is_hostname || is_ip;
 }
 
@@ -62,7 +62,7 @@ static void send_json_message(struct lws *wsi, const char *type, const char *key
     if (key && value) {
         json_object_set_new(root, key, json_string(value));
     }
-    
+
     char *json_str = json_dumps(root, JSON_COMPACT);
     if (json_str) {
         size_t len = strlen(json_str);
@@ -92,12 +92,12 @@ static void cleanup_mtr_process(struct per_session_data *pss) {
 
 static int start_mtr(struct lws *wsi, struct per_session_data *pss, const char *target, char *args[]) {
     int pipefd[2];
-    
+
     if (pipe(pipefd) == -1) {
         send_json_message(wsi, "error", "message", "Failed to create pipe");
         return -1;
     }
-    
+
     pid_t pid = fork();
     if (pid == -1) {
         close(pipefd[0]);
@@ -105,44 +105,44 @@ static int start_mtr(struct lws *wsi, struct per_session_data *pss, const char *
         send_json_message(wsi, "error", "message", "Failed to fork process");
         return -1;
     }
-    
+
     if (pid == 0) {
         // Child process
         close(pipefd[0]); // Close read end
         dup2(pipefd[1], STDOUT_FILENO);
         dup2(pipefd[1], STDERR_FILENO);
         close(pipefd[1]);
-        
+
         execvp("mtr", args);
-        
+
         // If exec fails
         fprintf(stderr, "Failed to execute mtr\n");
         exit(1);
     }
-    
+
     // Parent process
     close(pipefd[1]); // Close write end
     pss->pipe_fd = pipefd[0];
     pss->mtr_pid = pid;
     pss->running = 1;
     strncpy(pss->target, target, MAX_TARGET_LEN - 1);
-    
+
     // Set non-blocking
     int flags = fcntl(pss->pipe_fd, F_GETFL, 0);
     fcntl(pss->pipe_fd, F_SETFL, flags | O_NONBLOCK);
-    
+
     send_json_message(wsi, "started", "target", target);
-    
+
     return 0;
 }
 
 static void read_mtr_output(struct lws *wsi, struct per_session_data *pss) {
     char buffer[1024];
     ssize_t n;
-    
+
     while ((n = read(pss->pipe_fd, buffer, sizeof(buffer) - 1)) > 0) {
         buffer[n] = '\0';
-        
+
         // Split by newlines and send each line
         char *line = strtok(buffer, "\n");
         while (line) {
@@ -152,7 +152,7 @@ static void read_mtr_output(struct lws *wsi, struct per_session_data *pss) {
             line = strtok(NULL, "\n");
         }
     }
-    
+
     if (n == 0) {
         // EOF - process finished
         send_json_message(wsi, "complete", NULL, NULL);
@@ -173,7 +173,7 @@ static int append_arg(char *args[], char *arg) {
 static int callback_mtr(struct lws *wsi, enum lws_callback_reasons reason,
                         void *user, void *in, size_t len) {
     struct per_session_data *pss = (struct per_session_data *)user;
-    
+
     switch (reason) {
         case LWS_CALLBACK_ESTABLISHED:
             lwsl_user("WebSocket connection established\n");
@@ -195,7 +195,7 @@ static int callback_mtr(struct lws *wsi, enum lws_callback_reasons reason,
                 json_t *action = json_object_get(root, "action");
                 if (action && json_is_string(action)) {
                     const char *action_str = json_string_value(action);
-                    
+
                     if (strcmp(action_str, "start") == 0) {
                         json_t *target = json_object_get(root, "target");
                         json_t *packets = json_object_get(root, "packets");
@@ -207,7 +207,7 @@ static int callback_mtr(struct lws *wsi, enum lws_callback_reasons reason,
                         int packet_cnt = 10;
                         if (packets && json_is_integer(packets))
                             packet_cnt = json_integer_value(packets);
-                        
+
                         if (target && json_is_string(target)) {
                             const char *target_str = json_string_value(target);
                             char packet_str[16];
@@ -223,7 +223,7 @@ static int callback_mtr(struct lws *wsi, enum lws_callback_reasons reason,
                                 NULL,
                                 NULL,
                             };
-                            
+
                             if (protocol && json_is_string(protocol)) {
                                 const char *protocol_str = json_string_value(protocol);
                                 if (strcmp(protocol_str, "udp") == 0) {
@@ -248,7 +248,7 @@ static int callback_mtr(struct lws *wsi, enum lws_callback_reasons reason,
                             }
 
                             if (!is_valid_target(target_str)) {
-                                send_json_message(wsi, "error", "message", 
+                                send_json_message(wsi, "error", "message",
                                     "Invalid target hostname or IP address");
                             } else {
                                 if (pss->running) {
@@ -260,11 +260,11 @@ static int callback_mtr(struct lws *wsi, enum lws_callback_reasons reason,
                         }
                     }
                 }
-                
+
                 json_decref(root);
             }
             break;
-            
+
         case LWS_CALLBACK_SERVER_WRITEABLE:
             if (pss->running && pss->pipe_fd >= 0) {
                 read_mtr_output(wsi, pss);
@@ -273,16 +273,16 @@ static int callback_mtr(struct lws *wsi, enum lws_callback_reasons reason,
                 }
             }
             break;
-            
+
         case LWS_CALLBACK_CLOSED:
             lwsl_user("WebSocket connection closed\n");
             cleanup_mtr_process(pss);
             break;
-            
+
         default:
             break;
     }
-    
+
     return 0;
 }
 
@@ -293,9 +293,9 @@ static int callback_http(struct lws *wsi, enum lws_callback_reasons reason,
             {
                 const char *uri = (const char *)in;
                 lwsl_user("HTTP request: %s\n", uri);
-                
+
                 if (strcmp(uri, "/") == 0) {
-                    if (lws_serve_http_file(wsi, "./index.html", 
+                    if (lws_serve_http_file(wsi, "./index.html",
                         "text/html", NULL, 0)) {
                         return -1;
                     }
@@ -305,16 +305,16 @@ static int callback_http(struct lws *wsi, enum lws_callback_reasons reason,
                 }
             }
             break;
-            
+
         case LWS_CALLBACK_HTTP_WRITEABLE:
             if (lws_http_transaction_completed(wsi))
                 return -1;
             break;
-            
+
         default:
             break;
     }
-    
+
     return 0;
 }
 
@@ -374,34 +374,34 @@ int main(int argc, char **argv) {
                 port = atoi(optarg);
                 break;
         }
-    }    
-    
+    }
+
     signal(SIGINT, sigint_handler);
     signal(SIGTERM, sigint_handler);
 
     lws_set_log_level(LLL_ERR | LLL_WARN | LLL_USER, NULL);
-    
+
     memset(&info, 0, sizeof(info));
     info.port = port;
     info.protocols = protocols;
     info.mounts = &mount;
-    
+
     context = lws_create_context(&info);
     if (!context) {
         lwsl_err("Failed to create libwebsocket context\n");
         return 1;
     }
-    
+
     lwsl_user("MTR WebSocket server started on port %d\n", port);
     lwsl_user("Make sure 'mtr' is installed on your system\n");
     lwsl_user("Press Ctrl+C to quit\n");
-    
+
     while (!interrupted) {
         lws_service(context, 50);
     }
-    
+
     lws_context_destroy(context);
     lwsl_user("Server stopped\n");
-    
+
     return 0;
 }
