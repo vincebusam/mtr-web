@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MTR Traceroute Tool</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      overflow: hidden;
+    }
+
+    header {
+      background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%);
+      color: white;
+      padding: 30px;
+      text-align: center;
+    }
+
+    h1 {
+      font-size: 2em;
+      margin-bottom: 10px;
+    }
+
+    .subtitle {
+      opacity: 0.9;
+      font-size: 0.95em;
+    }
+
+    .content {
+      padding: 30px;
+    }
+
+    .input-group {
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 600;
+      color: #333;
+    }
+
+    input {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #e2e8f0;
+      border-radius: 6px;
+      font-size: 1em;
+      transition: border-color 0.3s;
+    }
+
+    input:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+
+    .button-group {
+      display: flex;
+      gap: 10px;
+    }
+
+    button {
+      flex: 1;
+      padding: 14px;
+      border: none;
+      border-radius: 6px;
+      font-size: 1em;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+
+    .btn-secondary {
+      background: #e2e8f0;
+      color: #2d3748;
+    }
+
+    button:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .status {
+      padding: 12px;
+      border-radius: 6px;
+      margin-top: 20px;
+      display: none;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .status.show {
+      display: flex;
+    }
+
+    .status.running {
+      background: #bee3f8;
+      color: #2c5282;
+      border-left: 4px solid #3182ce;
+    }
+
+    .status.error {
+      background: #fed7d7;
+      color: #c53030;
+      border-left: 4px solid #fc8181;
+    }
+
+    .status.complete {
+      background: #c6f6d5;
+      color: #22543d;
+      border-left: 4px solid #48bb78;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(44, 82, 130, 0.3);
+      border-top-color: #2c5282;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .result-container {
+      margin-top: 30px;
+      display: none;
+    }
+
+    .result-container.show {
+      display: block;
+    }
+
+    .result-header {
+      background: #f7fafc;
+      padding: 15px;
+      border-radius: 6px 6px 0 0;
+      border-left: 4px solid #667eea;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .result-header h3 {
+      color: #2d3748;
+      font-size: 1.1em;
+    }
+
+    .hop-count {
+      background: #667eea;
+      color: white;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 0.9em;
+    }
+
+    .result-output {
+      background: #1a202c;
+      color: #e2e8f0;
+      padding: 20px;
+      border-radius: 0 0 6px 6px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.85em;
+      line-height: 1.8;
+      overflow-x: auto;
+      max-height: 600px;
+      overflow-y: auto;
+    }
+
+    .hop-line {
+      display: grid;
+      grid-template-columns: 50px 490px 80px 80px 80px 80px 80px 80px;
+      gap: 15px;
+      padding: 8px 0;
+      border-bottom: 1px solid #2d3748;
+    }
+
+    .hop-line:hover {
+      background: #2d3748;
+    }
+
+    .hop-line.header {
+      color: #48bb78;
+      font-weight: bold;
+      border-bottom: 2px solid #48bb78;
+      position: sticky;
+      top: 0;
+      background: #1a202c;
+      z-index: 1;
+    }
+
+    .loss-high { color: #fc8181; }
+    .loss-medium { color: #f6ad55; }
+    .loss-low { color: #68d391; }
+
+    .info-box {
+      background: #e6fffa;
+      border-left: 4px solid #38b2ac;
+      padding: 15px;
+      border-radius: 6px;
+      margin-top: 20px;
+      font-size: 0.9em;
+      color: #234e52;
+    }
+
+    .connection-status {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 8px;
+    }
+
+    .connection-status.connected {
+      background: #48bb78;
+      box-shadow: 0 0 8px #48bb78;
+    }
+
+    .connection-status.disconnected {
+      background: #fc8181;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>🌐 MTR Traceroute Tool</h1>
+      <p class="subtitle">
+        <span class="connection-status disconnected" id="connStatus"></span>
+        Real-time network diagnostic with live streaming results
+      </p>
+    </header>
+
+    <div class="content">
+      <form id="mtrForm">
+        <div class="input-group">
+          <label for="target">Target Host or IP Address</label>
+          <input 
+            type="text" 
+            id="target" 
+            placeholder="e.g., google.com, 8.8.8.8, or cloudflare.com"
+            required
+          >
+        </div>
+
+        <div class="button-group">
+          <button type="submit" class="btn-primary" id="startBtn">
+            Start MTR Traceroute
+          </button>
+          <button type="button" class="btn-secondary" id="stopBtn" disabled>
+            Stop
+          </button>
+        </div>
+      </form>
+
+      <div id="status" class="status"></div>
+
+      <div id="resultContainer" class="result-container">
+        <div class="result-header">
+          <h3>Results for: <span id="targetDisplay"></span></h3>
+          <span class="hop-count" id="hopCount">0 hops</span>
+        </div>
+        <div class="result-output" id="output"></div>
+      </div>
+
+      <div class="info-box">
+        <strong>ℹ️ About MTR:</strong> MTR combines traceroute and ping functionality 
+        to provide continuous statistics about each network hop. Results stream in real-time 
+        showing packet loss percentage and latency (Last, Avg, Best, Worst, StDev) for each hop.
+        <br><br>
+        <strong>Interpreting results:</strong> Loss% indicates packet loss (lower is better), 
+        Avg shows average latency in milliseconds. High loss or latency at a specific hop may 
+        indicate network issues at that point.
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let ws = null;
+    let isRunning = false;
+    const hops = new Map();
+
+    const form = document.getElementById('mtrForm');
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const status = document.getElementById('status');
+    const resultContainer = document.getElementById('resultContainer');
+    const output = document.getElementById('output');
+    const targetDisplay = document.getElementById('targetDisplay');
+    const hopCount = document.getElementById('hopCount');
+    const connStatus = document.getElementById('connStatus');
+
+    function connectWebSocket() {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const port = window.location.port ? `:${window.location.port}` : '';
+      const wsUrl = `${protocol}//${window.location.hostname}${port}${window.location.pathname}ws`;
+      
+      ws = new WebSocket(wsUrl);
+
+      ws.onopen = () => {
+        console.log('WebSocket connected');
+        connStatus.className = 'connection-status connected';
+      };
+
+      ws.onclose = () => {
+        console.log('WebSocket disconnected');
+        connStatus.className = 'connection-status disconnected';
+        setTimeout(connectWebSocket, 3000);
+      };
+
+      ws.onerror = (error) => {
+        console.error('WebSocket error:', error);
+        showStatus('error', 'Connection error. Make sure the backend server is running.');
+      };
+
+      ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        handleMessage(data);
+      };
+    }
+
+    function handleMessage(data) {
+      switch(data.type) {
+        case 'started':
+          showStatus('running', `MTR traceroute started for ${data.target}...`);
+          targetDisplay.textContent = data.target;
+          resultContainer.classList.add('show');
+          output.innerHTML = '<div class="hop-line header"><div>Hop</div><div>Host</div><div>Loss%</div><div>Last</div><div>Avg</div><div>Best</div><div>Worst</div></div>';
+          hops.clear();
+          break;
+
+        case 'data':
+          parseMtrLine(data.line);
+          break;
+
+        case 'complete':
+          showStatus('complete', '✓ MTR traceroute completed');
+          isRunning = false;
+          startBtn.disabled = false;
+          stopBtn.disabled = true;
+          break;
+
+        case 'error':
+          showStatus('error', `Error: ${data.message}`);
+          isRunning = false;
+          startBtn.disabled = false;
+          stopBtn.disabled = true;
+          break;
+      }
+    }
+
+    function parseMtrLine(line) {
+      // MTR split format: p <seq> <hop> <ip> <rtt>
+      // h <hop> <ip>
+      const parts = line.split(/\s+/);
+      
+      if (parts[0] === 'h') {
+        // Hop announcement: h <hop> <ip>
+        const hopNum = parseInt(parts[1]);
+        const ip = parts[2];
+        
+        if (!hops.has(hopNum)) {
+          hops.set(hopNum, {
+            ip: ip,
+            sent: 0,
+            rcv: 0,
+            rtts: []
+          });
+        }
+      } else if (parts[0] === 'p') {
+        // Ping result: p <seq> <hop> <ip> <rtt>
+        const hopNum = parseInt(parts[2]);
+        const rtt = parseFloat(parts[4]);
+        
+        if (hops.has(hopNum)) {
+          const hop = hops.get(hopNum);
+          hop.sent++;
+          if (rtt >= 0) {
+            hop.rcv++;
+            hop.rtts.push(rtt);
+          }
+          hop.loss = hop.sent > 0 ? ((hop.sent - hop.received) / hop.sent * 100).toFixed(1) : 0;
+          if (hop.rtts.length > 0) {
+            hop.last = rtts[rtts.length - 1].toFixed(1);
+            hop.avg = (rtts.reduce((a, b) => a + b, 0) / rtts.length).toFixed(1);
+            hop.best = Math.min(...rtts).toFixed(1);
+            hop.wrst = Math.max(...rtts).toFixed(1);
+          }
+        }
+      } else {
+        const hopNum = parseInt(parts[0]);
+        hops.set(hopNum, {
+          ip: parts[1],
+          loss: Math.trunc(parseInt(parts[2]) / 1000),
+          rcv: parseInt(parts[3]),
+          sent: parseInt(parts[4]),
+          best: parseInt(parts[5]),
+          avg: parseInt(parts[6]),
+          wrst: parseInt(parts[7]),
+        });
+      }
+      
+      updateDisplay();
+    }
+
+    function updateDisplay() {
+      const lines = ['<div class="hop-line header"><div>Hop</div><div>Host</div><div>Loss%</div><div>Rcv</div><div>Sent</div><div>Best</div><div>Avg</div><div>Worst</div></div>'];
+      
+      const sortedHops = Array.from(hops.entries()).sort((a, b) => a[0] - b[0]);
+      
+      for (const [hopNum, hop] of sortedHops) {
+        
+        const lossClass = hop.loss > 5 ? 'loss-high' : hop.loss > 1 ? 'loss-medium' : 'loss-low';
+        
+        lines.push(`
+          <div class="hop-line">
+            <div>${hopNum}</div>
+            <div>${hop.ip}</div>
+            <div class="${lossClass}">${hop.loss}%</div>
+            <div>${hop.rcv}</div>
+            <div>${hop.sent}</div>
+            <div>${hop.best}</div>
+            <div>${hop.avg}</div>
+            <div>${hop.wrst}</div>
+          </div>
+        `);
+      }
+      
+      output.innerHTML = lines.join('');
+      hopCount.textContent = `${Math.max(...hops.keys())} hops`;
+    }
+
+    function showStatus(type, message) {
+      status.className = `status show ${type}`;
+      status.innerHTML = type === 'running' 
+        ? `<span class="spinner"></span><span>${message}</span>`
+        : `<span>${message}</span>`;
+    }
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      
+      if (!ws || ws.readyState !== WebSocket.OPEN) {
+        showStatus('error', 'Not connected to server. Please wait...');
+        return;
+      }
+
+      const target = document.getElementById('target').value.trim();
+      
+      if (!target) {
+        showStatus('error', 'Please enter a target host or IP address');
+        return;
+      }
+
+      isRunning = true;
+      startBtn.disabled = true;
+      stopBtn.disabled = false;
+      status.classList.remove('show');
+
+      ws.send(JSON.stringify({
+        action: 'start',
+        target: target
+      }));
+    });
+
+    stopBtn.addEventListener('click', () => {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.close();
+        connectWebSocket();
+      }
+      isRunning = false;
+      startBtn.disabled = false;
+      stopBtn.disabled = true;
+      showStatus('complete', 'Stopped by user');
+    });
+
+    // Initialize WebSocket connection
+    connectWebSocket();
+  </script>
+</body>
+</html>
