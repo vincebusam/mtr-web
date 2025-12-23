@@ -75,7 +75,7 @@ async def run_mtr(target, ws):
 
 @routes.get('/ws')
 async def websocket_handler(request):
-    ws = web.WebSocketResponse()
+    ws = web.WebSocketResponse(protocols=("mtr",))
     await ws.prepare(request)
     
     async for msg in ws:
