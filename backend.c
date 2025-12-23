@@ -13,6 +13,7 @@
 
 #define MAX_PAYLOAD 4096
 #define MAX_TARGET_LEN 256
+#define MAX_ARGS 12
 
 static int interrupted = 0;
 static struct lws_context *context = NULL;
@@ -89,7 +90,7 @@ static void cleanup_mtr_process(struct per_session_data *pss) {
     pss->running = 0;
 }
 
-static int start_mtr(struct lws *wsi, struct per_session_data *pss, const char *target) {
+static int start_mtr(struct lws *wsi, struct per_session_data *pss, const char *target, char *args[]) {
     int pipefd[2];
     
     if (pipe(pipefd) == -1) {
@@ -112,7 +113,7 @@ static int start_mtr(struct lws *wsi, struct per_session_data *pss, const char *
         dup2(pipefd[1], STDERR_FILENO);
         close(pipefd[1]);
         
-        execlp("mtr", "mtr", "--split", "--report-cycles", "20", target, NULL);
+        execvp("mtr", args);
         
         // If exec fails
         fprintf(stderr, "Failed to execute mtr\n");
@@ -159,6 +160,16 @@ static void read_mtr_output(struct lws *wsi, struct per_session_data *pss) {
     }
 }
 
+static int append_arg(char *args[], char *arg) {
+    for (int i=0; i<MAX_ARGS; i++) {
+        if (args[i] == NULL) {
+            args[i] = arg;
+            return 1;
+        }
+    }
+    return 0;
+}
+
 static int callback_mtr(struct lws *wsi, enum lws_callback_reasons reason,
                         void *user, void *in, size_t len) {
     struct per_session_data *pss = (struct per_session_data *)user;
@@ -170,26 +181,72 @@ static int callback_mtr(struct lws *wsi, enum lws_callback_reasons reason,
             pss->pipe_fd = -1;
             pss->running = 0;
             break;
-            
+
         case LWS_CALLBACK_RECEIVE:
             {
                 json_error_t error;
                 json_t *root = json_loadb(in, len, 0, &error);
-                
+
                 if (!root) {
                     send_json_message(wsi, "error", "message", "Invalid JSON");
                     break;
                 }
-                
+
                 json_t *action = json_object_get(root, "action");
                 if (action && json_is_string(action)) {
                     const char *action_str = json_string_value(action);
                     
                     if (strcmp(action_str, "start") == 0) {
                         json_t *target = json_object_get(root, "target");
+                        json_t *packets = json_object_get(root, "packets");
+                        json_t *protocol = json_object_get(root, "protocol");
+                        json_t *noDns = json_object_get(root, "noDns");
+                        json_t *ipv4 = json_object_get(root, "ipv4");
+                        json_t *ipv6 = json_object_get(root, "ipv6");
+
+                        int packet_cnt = 10;
+                        if (packets && json_is_integer(packets))
+                            packet_cnt = json_integer_value(packets);
+                        
                         if (target && json_is_string(target)) {
                             const char *target_str = json_string_value(target);
+                            char packet_str[16];
+                            snprintf(packet_str, sizeof(packet_str), "%d", packet_cnt);
+                            char *args[MAX_ARGS] = {
+                                "mtr",
+                                "--split",
+                                "--report-cycles",
+                                packet_str,
+                                (char *)target_str,
+                                NULL,
+                                NULL,
+                                NULL,
+                                NULL,
+                            };
                             
+                            if (protocol && json_is_string(protocol)) {
+                                const char *protocol_str = json_string_value(protocol);
+                                if (strcmp(protocol_str, "udp") == 0) {
+                                    append_arg(args, "--udp");
+                                }
+                                if (strcmp(protocol_str, "tcp") == 0) {
+                                    append_arg(args, "--tcp");
+                                }
+                                if (strcmp(protocol_str, "sctp") == 0) {
+                                    append_arg(args, "--sctp");
+                                }
+                            }
+
+                            if (noDns && json_is_boolean(noDns) && json_is_true(noDns)) {
+                                append_arg(args, "--no-dns");
+                            }
+
+                            if (ipv4 && json_is_boolean(ipv4) && json_is_true(ipv4)) {
+                                append_arg(args, "-4");
+                            } else if (ipv6 && json_is_boolean(ipv6) && json_is_true(ipv6)) {
+                                append_arg(args, "-6");
+                            }
+
                             if (!is_valid_target(target_str)) {
                                 send_json_message(wsi, "error", "message", 
                                     "Invalid target hostname or IP address");
@@ -197,7 +254,7 @@ static int callback_mtr(struct lws *wsi, enum lws_callback_reasons reason,
                                 if (pss->running) {
                                     cleanup_mtr_process(pss);
                                 }
-                                start_mtr(wsi, pss, target_str);
+                                start_mtr(wsi, pss, target_str, args);
                                 lws_callback_on_writable(wsi);
                             }
                         }
