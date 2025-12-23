@@ -69,6 +69,45 @@
       border-color: #667eea;
     }
 
+    select {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #e2e8f0;
+      border-radius: 6px;
+      font-size: 1em;
+      background: white;
+      cursor: pointer;
+      transition: border-color 0.3s;
+    }
+
+    select:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+
+    .checkbox-group {
+      display: flex;
+      align-items: center;
+    }
+
+    .checkbox-group label {
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+      margin-bottom: 0;
+    }
+
+    .checkbox-group input[type="checkbox"] {
+      width: auto;
+      margin-right: 8px;
+      cursor: pointer;
+    }
+
+    .checkbox-group span {
+      font-weight: 600;
+      color: #333;
+    }
+
     .button-group {
       display: flex;
       gap: 10px;
@@ -272,6 +311,52 @@
           >
         </div>
 
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 20px;">
+          <div class="input-group" style="margin-bottom: 0;">
+            <label for="packets">Number of Packets</label>
+            <select id="packets">
+              <option value="10" selected>10 packets</option>
+              <option value="25">25 packets</option>
+              <option value="50">50 packets</option>
+              <option value="100">100 packets</option>
+              <option value="200">200 packets</option>
+            </select>
+          </div>
+
+          <div class="input-group" style="margin-bottom: 0;">
+            <label for="protocol">Protocol</label>
+            <select id="protocol">
+              <option value="icmp" selected>ICMP</option>
+              <option value="udp">UDP</option>
+              <option value="tcp">TCP</option>
+              <option value="sctp">SCTP</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px;">
+          <div class="checkbox-group">
+            <label>
+              <input type="checkbox" id="noDns">
+              <span>No DNS Lookups</span>
+            </label>
+          </div>
+
+          <div class="checkbox-group">
+            <label>
+              <input type="checkbox" id="ipv4">
+              <span>Force IPv4</span>
+            </label>
+          </div>
+
+          <div class="checkbox-group">
+            <label>
+              <input type="checkbox" id="ipv6">
+              <span>Force IPv6</span>
+            </label>
+          </div>
+        </div>
+
         <div class="button-group">
           <button type="submit" class="btn-primary" id="startBtn">
             Start MTR Traceroute
@@ -318,6 +403,21 @@
     const targetDisplay = document.getElementById('targetDisplay');
     const hopCount = document.getElementById('hopCount');
     const connStatus = document.getElementById('connStatus');
+    const ipv4Checkbox = document.getElementById('ipv4');
+    const ipv6Checkbox = document.getElementById('ipv6');
+
+    // Handle IPv4/IPv6 mutual exclusivity
+    ipv4Checkbox.addEventListener('change', function() {
+      if (this.checked) {
+        ipv6Checkbox.checked = false;
+      }
+    });
+
+    ipv6Checkbox.addEventListener('change', function() {
+      if (this.checked) {
+        ipv4Checkbox.checked = false;
+      }
+    });
 
     function connectWebSocket() {
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -481,6 +581,12 @@
         return;
       }
 
+      const packets = document.getElementById('packets').value;
+      const protocol = document.getElementById('protocol').value;
+      const noDns = document.getElementById('noDns').checked;
+      const ipv4 = document.getElementById('ipv4').checked;
+      const ipv6 = document.getElementById('ipv6').checked;
+
       isRunning = true;
       startBtn.disabled = true;
       stopBtn.disabled = false;
@@ -488,7 +594,12 @@
 
       ws.send(JSON.stringify({
         action: 'start',
-        target: target
+        target: target,
+        packets: parseInt(packets),
+        protocol: protocol,
+        noDns: noDns,
+        ipv4: ipv4,
+        ipv6: ipv6
       }));
     });
 
