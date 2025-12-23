@@ -17,11 +17,29 @@ def is_valid_target(target):
     ip_pattern = r'^(\d{1,3}\.){3}\d{1,3}$'
     return bool(re.match(hostname_pattern, target) or re.match(ip_pattern, target))
 
-async def run_mtr(target, ws):
+async def run_mtr(data, ws):
     """Run mtr with --split option and stream results"""
     try:
         # Run mtr with split output for real-time updates
-        cmd = ['mtr', '--split', '--report-cycles', '20', target]
+        cmd = [
+            'mtr',
+            '--split',
+            '--report-cycles',
+            str(data.get("packets", 25)),
+            data["target"]
+        ]
+        if data.get("noDns"):
+            cmd.append("--no-dns")
+        if data.get("ipv4"):
+            cmd.append("-4")
+        if data.get("ipv6"):
+            cmd.append("-6")
+        if data.get("protocol") == "udp":
+            cmd.append("--udp")
+        if data.get("protocol") == "tcp":
+            cmd.append("--tcp")
+        if data.get("protocol") == "sctp":
+            cmd.append("--sctp")
         
         process = await asyncio.create_subprocess_exec(
             *cmd,
@@ -97,7 +115,7 @@ async def websocket_handler(request):
                     'target': target
                 })
                 
-                await run_mtr(target, ws)
+                await run_mtr(data, ws)
                 
         elif msg.type == web.WSMsgType.ERROR:
             print(f'WebSocket error: {ws.exception()}')
