@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # backend.py - Python WebSocket server for MTR
 
+import argparse
 import asyncio
 import json
 import re
@@ -126,6 +127,9 @@ async def init_app():
     return app
 
 if __name__ == '__main__':
-    print("MTR WebSocket server starting on http://localhost:8022")
+    parser = argparse.ArgumentParser(prog='MTR-web backend')
+    parser.add_argument('-p', '--port', default=8080)
+    args = parser.parse_args()
+    print(f"MTR WebSocket server starting on http://localhost:{args.port}")
     print("Make sure 'mtr' is installed on your system")
-    web.run_app(init_app(), host='0.0.0.0', port=8022)
+    web.run_app(init_app(), host='0.0.0.0', port=args.port)
