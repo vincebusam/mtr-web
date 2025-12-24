@@ -429,6 +429,7 @@
       ws.onopen = () => {
         console.log('WebSocket connected');
         connStatus.className = 'connection-status connected';
+        status.classList.remove('show');
       };
 
       ws.onclose = () => {
