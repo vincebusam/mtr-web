@@ -77,10 +77,17 @@ static void send_json_message(struct lws *wsi, const char *type, const char *key
     json_decref(root);
 }
 
+static void delayed_waitpid_cb(struct lws_sorted_usec_list *sul) {
+    while (waitpid(-1, 0, WNOHANG) > 0);
+}
+
 static void cleanup_mtr_process(struct per_session_data *pss) {
+    static lws_sorted_usec_list_t sul_stagger;
     if (pss->mtr_pid > 0) {
         kill(pss->mtr_pid, SIGTERM);
         waitpid(pss->mtr_pid, NULL, WNOHANG);
+        memset(&sul_stagger, 0, sizeof(lws_sorted_usec_list_t));
+        lws_sul_schedule(context, 0, &sul_stagger, delayed_waitpid_cb, 15 * LWS_US_PER_SEC);
         pss->mtr_pid = 0;
     }
     if (pss->pipe_fd >= 0) {
