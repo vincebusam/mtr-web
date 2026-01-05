@@ -40,6 +40,9 @@ async def run_mtr(data, ws):
             cmd.append("--tcp")
         if data.get("protocol") == "sctp":
             cmd.append("--sctp")
+        if data.get("interface"):
+            cmd.append("-I")
+            cmd.append(data["interface"])
         
         process = await asyncio.create_subprocess_exec(
             *cmd,

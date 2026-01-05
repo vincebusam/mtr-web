@@ -13,7 +13,7 @@
 
 #define MAX_PAYLOAD 4096
 #define MAX_TARGET_LEN 256
-#define MAX_ARGS 12
+#define MAX_ARGS 16
 
 static int interrupted = 0;
 static struct lws_context *context = NULL;
@@ -210,6 +210,7 @@ static int callback_mtr(struct lws *wsi, enum lws_callback_reasons reason,
                         json_t *noDns = json_object_get(root, "noDns");
                         json_t *ipv4 = json_object_get(root, "ipv4");
                         json_t *ipv6 = json_object_get(root, "ipv6");
+                        json_t *interface = json_object_get(root, "interface");
 
                         int packet_cnt = 10;
                         if (packets && json_is_integer(packets))
@@ -225,6 +226,9 @@ static int callback_mtr(struct lws *wsi, enum lws_callback_reasons reason,
                                 "--report-cycles",
                                 packet_str,
                                 (char *)target_str,
+                                NULL,
+                                NULL,
+                                NULL,
                                 NULL,
                                 NULL,
                                 NULL,
@@ -252,6 +256,11 @@ static int callback_mtr(struct lws *wsi, enum lws_callback_reasons reason,
                                 append_arg(args, "-4");
                             } else if (ipv6 && json_is_boolean(ipv6) && json_is_true(ipv6)) {
                                 append_arg(args, "-6");
+                            }
+
+                            if (interface && json_is_string(interface) && (json_string_length(interface) > 0)) {
+                                append_arg(args, "-I");
+                                append_arg(args, (char *)json_string_value(interface));
                             }
 
                             if (!is_valid_target(target_str)) {

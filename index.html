@@ -311,7 +311,7 @@
           >
         </div>
 
-        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 20px;">
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px;">
           <div class="input-group" style="margin-bottom: 0;">
             <label for="packets">Number of Packets</label>
             <select id="packets">
@@ -330,6 +330,13 @@
               <option value="udp">UDP</option>
               <option value="tcp">TCP</option>
               <option value="sctp">SCTP</option>
+            </select>
+          </div>
+
+          <div class="input-group" style="margin-bottom: 0;">
+            <label for="interface">Interface</label>
+            <select id="interface">
+              <option value="" selected>default</option>
             </select>
           </div>
         </div>
@@ -600,7 +607,8 @@
         protocol: protocol,
         noDns: noDns,
         ipv4: ipv4,
-        ipv6: ipv6
+        ipv6: ipv6,
+        interface: document.getElementById("interface").value
       }));
     });
 
@@ -614,6 +622,27 @@
       stopBtn.disabled = true;
       showStatus('complete', 'Stopped by user');
     });
+
+    function load_settings() {
+        fetch('config.json')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+          data.interfaces.map(interface => {
+            document.getElementById("interface").appendChild(new Option(interface, interface))
+          })
+        })
+        .catch(error => {
+            console.error('Error fetching default iperf server:', error);
+        });
+    }
+
+    // Initialize on load
+    load_settings();
 
     // Initialize WebSocket connection
     connectWebSocket();
